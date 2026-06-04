@@ -68,7 +68,14 @@ conn.executescript("""
 # 插入种子数据
 # ═══ 种子数据辅助函数 ═══
 def seed_data():
-    # 站名→ID 映射（用于换乘关系）
+    import math
+    def haversine_km(lat1, lng1, lat2, lng2):
+        R = 6371; dlat = math.radians(lat2-lat1); dlng = math.radians(lng2-lng1)
+        a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1))*math.cos(math.radians(lat2))*math.sin(dlng/2)**2
+        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+
+    SPEED_KPH = 35  # 地铁平均时速 km/h
+
     sid_map = {}
 
     def add_line(line_name, stations):
@@ -83,13 +90,17 @@ def seed_data():
                 (sid, name, line_name, lat, lng, ptype),
             )
         for i in range(len(ids) - 1):
+            _, lat1, lng1, _ = stations[i]
+            _, lat2, lng2, _ = stations[i+1]
+            dist = round(haversine_km(lat1, lng1, lat2, lng2), 2)
+            time_min = max(1, round(dist / SPEED_KPH * 60))
             conn.execute(
                 "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-                (ids[i], ids[i+1], line_name, "up", 2, 1.3),
+                (ids[i], ids[i+1], line_name, "up", time_min, dist),
             )
             conn.execute(
                 "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-                (ids[i+1], ids[i], line_name, "down", 2, 1.3),
+                (ids[i+1], ids[i], line_name, "down", time_min, dist),
             )
         # 环线闭合边（仅限2号线）
         if line_name == "2号线" and len(ids) > 1:

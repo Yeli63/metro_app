@@ -191,7 +191,9 @@ class RaptorEngine:
                       path: list, lines: list, tlist: list, strategy: str) -> dict:
         from services.fare_calculator import fare_calculator
 
-        price = fare_calculator.calculate(conn, path[0], path[-1])
+        # 按实际路径距离计算票价（不用直线距离）
+        path_dist, _ = fare_calculator.calculate_path_distance(conn, path)
+        price = fare_calculator._get_fare_by_distance(conn, path_dist)
 
         return {
             "totalTime": round(total_time, 1),
