@@ -117,7 +117,7 @@ def seed_data():
         ("line1_010", "line1_005", "1号线", "down", 2, 0.8),
     )
 
-    # 换乘关系
+    # 换乘关系：公园前（1↔2）
     conn.execute(
         "INSERT OR IGNORE INTO transfers (station_id, from_line, to_line, walk_time, is_cross_platform) VALUES (?, ?, ?, ?, ?)",
         ("line1_010", "1号线", "2号线", 5, 0),
@@ -125,6 +125,54 @@ def seed_data():
     conn.execute(
         "INSERT OR IGNORE INTO transfers (station_id, from_line, to_line, walk_time, is_cross_platform) VALUES (?, ?, ?, ?, ?)",
         ("line2_001", "2号线", "1号线", 5, 0),
+    )
+
+    # ── 1号线延伸：公园前 → 体育西路 ──
+    conn.execute(
+        "INSERT OR IGNORE INTO stations (id, name, line, lat, lng, platform_type) VALUES (?, ?, ?, ?, ?, ?)",
+        ("line1_011", "体育西路", "1号线", 23.132, 113.320, "island"),
+    )
+    # 公园前 → 体育西路
+    conn.execute(
+        "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+        ("line1_010", "line1_011", "1号线", "up", 3, 1.5),
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+        ("line1_011", "line1_010", "1号线", "down", 3, 1.5),
+    )
+
+    # ── 3号线：机场北 → 体育西路 ──
+    line3_stations = [
+        ("line3_001", "机场北", "3号线", 23.392, 113.300, "side"),
+        ("line3_002", "嘉禾望岗", "3号线", 23.238, 113.280, "island"),
+        ("line3_003", "燕塘", "3号线", 23.160, 113.330, "side"),
+        ("line3_004", "广州东站", "3号线", 23.150, 113.325, "island"),
+        ("line3_005", "体育西路", "3号线", 23.132, 113.320, "island"),
+    ]
+    conn.executemany(
+        "INSERT OR IGNORE INTO stations (id, name, line, lat, lng, platform_type) VALUES (?, ?, ?, ?, ?, ?)",
+        line3_stations,
+    )
+    # 3号线边（上下行）
+    for i in range(len(line3_stations) - 1):
+        conn.execute(
+            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+            (line3_stations[i][0], line3_stations[i + 1][0], "3号线", "up", 3, 2.0 + i * 1.5),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+            (line3_stations[i + 1][0], line3_stations[i][0], "3号线", "down", 3, 2.0 + i * 1.5),
+        )
+
+    # 换乘关系：体育西路（1↔3）
+    conn.execute(
+        "INSERT OR IGNORE INTO transfers (station_id, from_line, to_line, walk_time, is_cross_platform) VALUES (?, ?, ?, ?, ?)",
+        ("line1_011", "1号线", "3号线", 6, 0),
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO transfers (station_id, from_line, to_line, walk_time, is_cross_platform) VALUES (?, ?, ?, ?, ?)",
+        ("line3_005", "3号线", "1号线", 6, 0),
     )
 
     # 默认阶梯票价（广州地铁）

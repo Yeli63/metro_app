@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>地铁智行</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="header">
+  <h1>地铁智行</h1>
+  <p class="subtitle">多策略换乘规划 · 开门提醒 · 票价计算</p>
+</header>
+
+<main class="main">
+  <!-- 查询表单 -->
+  <section class="search-card">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fromStation">起点站</label>
+        <input type="text" id="fromStation" placeholder="输入起点站名" autocomplete="off">
+        <div class="suggestions" id="fromSuggestions"></div>
+      </div>
+      <div class="swap-btn" id="swapBtn" title="交换起终点">&#8644;</div>
+      <div class="form-group">
+        <label for="toStation">终点站</label>
+        <input type="text" id="toStation" placeholder="输入终点站名" autocomplete="off">
+        <div class="suggestions" id="toSuggestions"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="strategy">规划策略</label>
+        <select id="strategy">
+          <option value="time">时间最短</option>
+          <option value="transfers">换乘最少</option>
+          <option value="price">票价最低</option>
+        </select>
+      </div>
+      <button class="search-btn" id="searchBtn">查询路线</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+  </section>
+
+  <!-- 加载动画 -->
+  <div class="loading" id="loading" style="display:none">
+    <div class="spinner"></div>
+    <p>正在规划路线...</p>
+  </div>
+
+  <!-- 结果列表 -->
+  <section class="results" id="results"></section>
+
+  <!-- 开门提醒查询 -->
+  <section class="door-card">
+    <h2>开门方向查询</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="doorLine">线路</label>
+        <input type="text" id="doorLine" placeholder="如: 1号线">
+      </div>
+      <div class="form-group">
+        <label for="doorStation">站名</label>
+        <input type="text" id="doorStation" placeholder="如: 公园前">
+      </div>
+      <div class="form-group">
+        <label for="doorDirection">方向</label>
+        <select id="doorDirection">
+          <option value="up">上行</option>
+          <option value="down">下行</option>
+        </select>
+      </div>
+      <button class="search-btn" id="doorBtn">查询</button>
+    </div>
+    <div class="door-result" id="doorResult"></div>
+  </section>
+
+  <!-- 用户登录（简化） -->
+  <section class="auth-card">
+    <h2>用户登录</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="phone">手机号</label>
+        <input type="text" id="phone" placeholder="11位手机号" maxlength="11">
+      </div>
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" placeholder="输入密码">
+      </div>
+      <button class="search-btn" id="loginBtn">登录</button>
+      <button class="search-btn secondary" id="registerBtn">注册</button>
+    </div>
+    <div class="auth-result" id="authResult"></div>
+  </section>
+</main>
+
+<footer class="footer">
+  <p>地铁智行 &copy; 2026 — 软件安全工程课程项目</p>
+</footer>
+
+<script src="js/app.js"></script>
+</body>
+</html>

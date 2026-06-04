@@ -1,10 +1,12 @@
 """RAPTOR 路径规划引擎。
 
-简化版实现：支持同线路直达和一次换乘的路径搜索。
+迭代式实现：支持 0~N 次换乘的路径搜索。
 """
 
 import sqlite3
 import os
+from collections import defaultdict
+from heapq import heappush, heappop
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,16 +23,6 @@ class RaptorEngine:
         return conn
 
     def find_path(self, origin_name: str, dest_name: str, strategy: str = "time") -> dict:
-        """查询行程方案。
-
-        Args:
-            origin_name: 起点站名称
-            dest_name: 终点站名称
-            strategy: 排序策略 'time' | 'transfers' | 'price'
-
-        Returns:
-            dict: {"routes": [...]} 或 {"error": "..."}
-        """
         conn = self._get_conn()
         try:
             origin_stations = self._get_station_by_name(conn, origin_name)
@@ -39,14 +31,13 @@ class RaptorEngine:
             if not origin_stations or not dest_stations:
                 return {"error": "站点不存在"}
 
+            dest_ids = {d["id"] for d in dest_stations}
+
             routes = []
             for origin in origin_stations:
-                for dest in dest_stations:
-                    result = self._single_pair_search(conn, origin["id"], dest["id"], strategy)
-                    if result:
-                        routes.append(result)
+                results = self._multi_transfer_search(conn, origin["id"], dest_ids, strategy)
+                routes.extend(results)
 
-            # 按策略排序
             key_map = {
                 "time": lambda r: (r["totalTime"], r["transfers"]),
                 "transfers": lambda r: (r["transfers"], r["totalTime"]),
@@ -59,130 +50,162 @@ class RaptorEngine:
         finally:
             conn.close()
 
-    def _single_pair_search(self, conn, origin_id: str, dest_id: str, strategy: str) -> dict | None:
-        # 同线路直达
-        direct = self._direct_route(conn, origin_id, dest_id)
-        if direct:
-            return self._build_solution(conn, direct["stations"], direct["line"], [], strategy)
+    # ── 多次换乘搜索 ──
 
-        # 一次换乘
+    def _multi_transfer_search(self, conn, origin_id: str, dest_ids: set, strategy: str) -> list:
+        """迭代式 RAPTOR：每轮沿线路扩展，换乘站进入下一轮。"""
+        # 预加载线路站点顺序
+        line_stations = self._load_line_stations(conn)
+
+        # 起点信息
         origin_line = self._get_station_line(conn, origin_id)
-        dest_line = self._get_station_line(conn, dest_id)
-        if origin_line == dest_line:
-            return None
 
-        transfer_rows = conn.execute(
-            "SELECT station_id FROM transfers WHERE from_line = ? AND to_line = ?",
-            (origin_line, dest_line),
-        ).fetchall()
+        # best[station_id] = (time, transfers, path_stations, path_lines, transfer_list)
+        best = {}
 
-        for transfer in transfer_rows:
-            tid = transfer["station_id"]
-            transfer_name = self._get_station_name(conn, tid)
-            # 找到换乘站对应目标线路上的同名站
-            dest_transfer = conn.execute(
-                "SELECT id FROM stations WHERE name = ? AND line = ?",
-                (transfer_name, dest_line),
-            ).fetchone()
-            if not dest_transfer:
-                continue
-            dest_tid = dest_transfer["id"]
+        # 第 0 轮：沿起点线路双向探索
+        for dir in ("up", "down"):
+            self._explore_line(conn, origin_id, origin_line, dir,
+                               [], [origin_line], [],
+                               0, 0, best, line_stations, dest_ids)
 
-            first_leg = self._direct_route(conn, origin_id, tid)
-            second_leg = self._direct_route(conn, dest_tid, dest_id)
-            if first_leg and second_leg:
-                walk_time = self._get_transfer_walk_time(conn, tid, origin_line, dest_line)
-                transfer_info = [{
-                    "station": self._get_station_name(conn, tid),
-                    "fromLine": origin_line,
-                    "toLine": dest_line,
-                    "walkTime": walk_time,
-                }]
-                # 拼接两段路径（换乘站保留两个线路版本）
-                combined_stations = first_leg["stations"] + second_leg["stations"]
-                return self._build_solution(
-                    conn, combined_stations,
-                    [first_leg["line"], second_leg["line"]],
-                    transfer_info, strategy,
-                )
+        solutions = []
+        for sid, (time, transfers, path_stations, path_lines, transfer_list) in best.items():
+            if sid in dest_ids:
+                solutions.append(self._build_result(conn, sid, time, transfers,
+                                                     path_stations, path_lines, transfer_list, strategy))
 
-        return None
+        # 第 1~max_transfers 轮：从上一轮到达的站点出发，尝试换乘
+        for round_num in range(1, self.max_transfers + 1):
+            # 收集上一轮到达的站点（恰好 round_num-1 次换乘）
+            frontier = [(sid, data) for sid, data in best.items() if data[1] == round_num - 1]
 
-    def _direct_route(self, conn, from_id: str, to_id: str) -> dict | None:
-        from_row = conn.execute("SELECT * FROM stations WHERE id = ?", (from_id,)).fetchone()
-        to_row = conn.execute("SELECT * FROM stations WHERE id = ?", (to_id,)).fetchone()
-        if not from_row or not to_row or from_row["line"] != to_row["line"]:
-            return None
+            if not frontier:
+                break
 
-        line = from_row["line"]
-        for direction in ("up", "down"):
-            path = self._traverse_line(conn, from_id, to_id, line, direction)
-            if path:
-                return {"stations": path, "line": line}
-        return None
+            for station_id, (time, transfers, path, lines, tlist) in frontier:
+                station_name = self._get_station_name(conn, station_id)
+                current_line = lines[-1] if lines else self._get_station_line(conn, station_id)
 
-    def _traverse_line(self, conn, from_id: str, to_id: str, line: str, direction: str) -> list | None:
-        """BFS 沿线路边搜索路径。"""
-        visited = set()
-        queue = [(from_id, [from_id])]
+                # 查找从当前线路出发的所有换乘
+                transfer_rows = conn.execute(
+                    "SELECT to_line, walk_time FROM transfers WHERE station_id = ? AND from_line = ?",
+                    (station_id, current_line),
+                ).fetchall()
 
-        while queue:
-            current_id, path = queue.pop(0)
-            if current_id == to_id:
-                return path
-            if current_id in visited:
-                continue
-            visited.add(current_id)
+                for tr in transfer_rows:
+                    new_line = tr["to_line"]
+                    if new_line in lines:
+                        continue  # 避免回环
 
-            edges = conn.execute(
-                "SELECT to_station FROM edges WHERE from_station = ? AND line = ? AND direction = ?",
-                (current_id, line, direction),
-            ).fetchall()
+                    walk_time = tr["walk_time"]
+                    # 找到同名站在新线路上的 ID
+                    dest_transfer = conn.execute(
+                        "SELECT id FROM stations WHERE name = ? AND line = ?",
+                        (station_name, new_line),
+                    ).fetchone()
+                    if not dest_transfer:
+                        continue
 
-            for edge in edges:
-                if edge["to_station"] not in visited:
-                    queue.append((edge["to_station"], path + [edge["to_station"]]))
+                    new_tid = dest_transfer["id"]
+                    new_time = time + walk_time
+                    new_transfers = transfers + 1
+                    new_lines = lines + [new_line]
+                    new_tlist = tlist + [{
+                        "station": station_name,
+                        "fromLine": current_line,
+                        "toLine": new_line,
+                        "walkTime": walk_time,
+                    }]
 
-        return None
+                    for dir in ("up", "down"):
+                        self._explore_line(conn, new_tid, new_line, dir,
+                                           path, new_lines, new_tlist,
+                                           new_time, new_transfers,
+                                           best, line_stations, dest_ids)
 
-    def _build_solution(self, conn, station_ids: list, lines, transfers: list, strategy: str) -> dict:
-        """构建路径方案。
+        # 从 best 中收集到达目标的方案
+        for sid, (time, transfers, path_stations, path_lines, transfer_list) in best.items():
+            if sid in dest_ids:
+                solutions.append(self._build_result(conn, sid, time, transfers,
+                                                     path_stations, path_lines, transfer_list, strategy))
 
-        Args:
-            lines: 单线路字符串（直达场景）或多线路列表（换乘场景）
+        return solutions
+
+    def _explore_line(self, conn, start_id: str, line: str, direction: str,
+                      prefix_path: list, prefix_lines: list, prefix_transfers: list,
+                      base_time: float, base_transfers: int,
+                      best: dict, line_stations: dict, dest_ids: set):
+        """沿线路朝某个方向扩展，将到达的站点更新到 best 中。"""
+        if line not in line_stations:
+            return
+
+        stations_in_order = line_stations[line][direction]
+        try:
+            start_idx = stations_in_order.index(start_id)
+        except ValueError:
+            return
+
+        acc_time = base_time
+        # 从起点站（含）开始，沿方向逐个遍历
+        for i in range(start_idx, len(stations_in_order)):
+            sid = stations_in_order[i]
+            if i > start_idx:
+                # 查边耗时
+                edge = conn.execute(
+                    "SELECT travel_time FROM edges WHERE from_station = ? AND to_station = ?",
+                    (stations_in_order[i - 1], sid),
+                ).fetchone()
+                if not edge:
+                    break
+                acc_time += edge["travel_time"]
+
+            path = prefix_path + stations_in_order[start_idx:i + 1]
+
+            # 更新 best
+            key = (acc_time, base_transfers)
+            if sid not in best or key < (best[sid][0], best[sid][1]):
+                # 合并路径：如果 prefix_path 的最后一个站与当前路径首站相同则去重
+                best[sid] = (acc_time, base_transfers, path, list(prefix_lines), list(prefix_transfers))
+
+    def _load_line_stations(self, conn) -> dict:
+        """预加载每条线路在两个方向上的站点序列。
+
+        Returns: {line: {"up": [id1, id2, ...], "down": [idN, ..., id1]}}
         """
-        line_list = lines if isinstance(lines, list) else [lines]
+        line_stations = defaultdict(lambda: {"up": [], "down": []})
 
-        # 边查询不限定线路也能唯一确定（同站对之间不会有多条线路的边）
-        segment_time = 0
-        for i in range(len(station_ids) - 1):
-            edge = conn.execute(
-                "SELECT travel_time FROM edges WHERE from_station = ? AND to_station = ?",
-                (station_ids[i], station_ids[i + 1]),
-            ).fetchone()
-            if edge:
-                segment_time += edge["travel_time"]
+        stations = conn.execute("SELECT id, line FROM stations ORDER BY id").fetchall()
+        for s in stations:
+            line_stations[s["line"]]["up"].append(s["id"])
 
-        total_time = segment_time
-        for t in transfers:
-            total_time += t["walkTime"]
+        # 下行是上行的反向
+        for line in line_stations:
+            line_stations[line]["down"] = list(reversed(line_stations[line]["up"]))
 
+        return dict(line_stations)
+
+    # ── 结果构建 ──
+
+    def _build_result(self, conn, dest_id: str, total_time: float, transfers: int,
+                      path: list, lines: list, tlist: list, strategy: str) -> dict:
         from services.fare_calculator import fare_calculator
 
-        price = fare_calculator.calculate(conn, station_ids[0], station_ids[-1])
+        price = fare_calculator.calculate(conn, path[0], path[-1])
 
         return {
-            "totalTime": total_time,
-            "transfers": len(transfers),
+            "totalTime": round(total_time, 1),
+            "transfers": transfers,
             "price": price,
-            "lines": line_list,
+            "lines": lines,
             "details": {
-                "stations": [self._get_station_name(conn, sid) for sid in station_ids],
-                "transfers": transfers,
+                "stations": [self._get_station_name(conn, sid) for sid in path],
+                "transfers": tlist,
             },
         }
 
-    # --- 辅助查询 ---
+    # ── 辅助查询 ──
+
     def _get_station_by_name(self, conn, name: str):
         return conn.execute("SELECT * FROM stations WHERE name = ?", (name,)).fetchall()
 
@@ -193,13 +216,6 @@ class RaptorEngine:
     def _get_station_name(self, conn, station_id: str) -> str:
         row = conn.execute("SELECT name FROM stations WHERE id = ?", (station_id,)).fetchone()
         return row["name"] if row else station_id
-
-    def _get_transfer_walk_time(self, conn, station_id: str, from_line: str, to_line: str) -> int:
-        row = conn.execute(
-            "SELECT walk_time FROM transfers WHERE station_id = ? AND from_line = ? AND to_line = ?",
-            (station_id, from_line, to_line),
-        ).fetchone()
-        return row["walk_time"] if row else 5
 
 
 raptor_engine = RaptorEngine()
