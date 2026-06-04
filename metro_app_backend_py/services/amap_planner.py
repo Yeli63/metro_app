@@ -137,24 +137,34 @@ class AmapPlanner:
                     seg_time = max(1, seg_sec // 60)
                     total_time += seg_time
 
-                    # 途经站点
+                    # 途经站点 — 裁剪到实际起止站之间
                     stops = bl.get("via_stops", [])
                     departure = bl.get("departure_stop", {})
                     arrival = bl.get("arrival_stop", {})
 
-                    seg_stations = []
-                    if departure:
-                        name = departure.get("name", "")
-                        if name:
-                            seg_stations.append(self._clean_station(name))
+                    dep_name = self._clean_station(departure.get("name", ""))
+                    arr_name = self._clean_station(arrival.get("name", ""))
+
+                    # 构建完整站序: departure + via_stops + arrival
+                    full_stops = []
+                    if dep_name:
+                        full_stops.append(dep_name)
                     for s in stops:
-                        name = s.get("name", "")
-                        if name:
-                            seg_stations.append(self._clean_station(name))
-                    if arrival:
-                        name = arrival.get("name", "")
-                        if name:
-                            seg_stations.append(self._clean_station(name))
+                        n = self._clean_station(s.get("name", ""))
+                        if n:
+                            full_stops.append(n)
+                    if arr_name and arr_name != full_stops[-1] if full_stops else True:
+                        full_stops.append(arr_name)
+
+                    # 裁剪: 找到 departure 和 arrival 在列表中的位置
+                    start_idx = 0
+                    end_idx = len(full_stops) - 1
+                    if dep_name in full_stops:
+                        start_idx = full_stops.index(dep_name)
+                    if arr_name in full_stops:
+                        end_idx = full_stops.index(arr_name)
+
+                    seg_stations = full_stops[start_idx:end_idx + 1]
 
                     if seg_stations:
                         all_stations.extend(seg_stations)
