@@ -5,12 +5,25 @@ import os
 from fastapi import APIRouter, Query, Request
 from dotenv import load_dotenv
 from services.raptor_engine import raptor_engine
+from services.amap_planner import amap_planner, AMAP_KEY
 from services.door_reminder import door_reminder
 from services.station_facilities import station_facilities
 from middleware.rate_limiter import limiter, PLAN_LIMIT
 
 load_dotenv()
 router = APIRouter()
+
+
+def _get_station_coords(name: str) -> tuple | None:
+    """从本地 SQLite 获取站点坐标。"""
+    db_path = os.environ.get("SQLITE_PATH", "./data/metro_network.sqlite")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT lat, lng FROM stations WHERE name = ? LIMIT 1", (name,)).fetchone()
+    conn.close()
+    if row:
+        return (row["lat"], row["lng"])
+    return None
 
 
 @router.get("/api/plan")
@@ -21,9 +34,25 @@ def plan_route(
     to: str = Query(..., description="终点站名称"),
     strategy: str = Query("time", description="排序策略: time | transfers | price"),
 ):
+    # ① 先获取坐标
+    from_coords = _get_station_coords(from_)
+    to_coords = _get_station_coords(to)
+
+    # ② 高德 API 优先（需配置 AMAP_KEY 且站名能在本地库里找到坐标）
+    if AMAP_KEY and from_coords and to_coords:
+        amap_result = amap_planner.find_path(
+            from_coords[0], from_coords[1],
+            to_coords[0], to_coords[1],
+            strategy,
+        )
+        if amap_result and amap_result.get("routes"):
+            return amap_result
+
+    # ③ 高德不可用 → 本地 RAPTOR 兜底
     result = raptor_engine.find_path(from_, to, strategy)
     if "error" in result:
         return {"error": result["error"]}
+    result["source"] = "local"
     return result
 
 
