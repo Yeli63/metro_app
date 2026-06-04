@@ -84,8 +84,25 @@ class AmapPlanner:
         except Exception:
             return None
 
+    @staticmethod
+    def _is_metro(line_name: str) -> bool:
+        """判断是否为地铁线路（过滤掉公交）。"""
+        import re
+        if not line_name:
+            return False
+        # 公交特征优先排除: 数字+路(如"1路""822路") 或 字母+数字+路(如"T58路")
+        if re.search(r'\d+路', line_name) or re.search(r'[A-Z]\d+路', line_name):
+            return False
+        # 地铁特征: X号线 或 地铁X号线
+        if re.search(r'\d+号线', line_name) or '地铁' in line_name.split('(')[0]:
+            return True
+        # 特殊线路名
+        if re.match(r'^(S1|首都机场|大兴机场|燕房|西郊|亦庄|昌平|房山)', line_name):
+            return True
+        return False
+
     def _parse_transit(self, transit: dict) -> dict | None:
-        """将高德公交方案转为我们的统一格式。"""
+        """将高德公交方案转为我们的统一格式(仅保留地铁段)。"""
         segments = transit.get("segments", [])
         if not segments:
             return None
@@ -97,6 +114,7 @@ class AmapPlanner:
         transfer_count = 0
         total_walk = 0
         price = float(transit.get("cost", 0))
+        has_metro = False
 
         for seg in segments:
             bus = seg.get("bus", {})
@@ -112,6 +130,9 @@ class AmapPlanner:
             if buslines:
                 for bl in buslines:
                     line_name = bl.get("name", "")
+                    if not self._is_metro(line_name):
+                        continue  # 跳过公交段
+                    has_metro = True
                     seg_sec = int(bl.get("duration", 0))
                     seg_time = max(1, seg_sec // 60)
                     total_time += seg_time
@@ -155,7 +176,7 @@ class AmapPlanner:
                     })
                 total_walk = 0
 
-        if not all_stations:
+        if not has_metro or not all_stations:
             return None
 
         return {
