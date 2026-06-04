@@ -104,15 +104,16 @@ class AmapPlanner:
             walking = seg.get("walking", {})
 
             if walking:
-                walk_dist = int(walking.get("distance", 0))
-                walk_time = max(1, int(walk_dist / 80))  # 80m/min 步行速度
+                walk_sec = int(walking.get("duration", 0))
+                walk_time = max(1, walk_sec // 60)
                 total_time += walk_time
                 total_walk += walk_time
 
             if buslines:
                 for bl in buslines:
                     line_name = bl.get("name", "")
-                    seg_time = int(bl.get("duration", 0))
+                    seg_sec = int(bl.get("duration", 0))
+                    seg_time = max(1, seg_sec // 60)
                     total_time += seg_time
 
                     # 途经站点
