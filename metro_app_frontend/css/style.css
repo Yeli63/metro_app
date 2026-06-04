@@ -112,6 +112,22 @@ body {
 .auth-result.success { background: #e6f4ea; color: #0f9d58; }
 .auth-result.error { background: #fce8e6; color: #d93025; }
 
+/* 设施查询 */
+.facility-card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.facility-result { margin-top: 0.8rem; display: none; }
+.facility-result.show { display: block; }
+.facility-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.6rem; }
+.facility-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.8rem; border-radius: 8px; background: #f8f9fa; font-size: 0.85rem; }
+.facility-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: white; flex-shrink: 0; }
+.facility-icon.restroom { background: #34a853; }
+.facility-icon.accessible_restroom { background: #1a73e8; }
+.facility-icon.nursing_room { background: #e8710a; }
+.facility-icon.accessible_elevator { background: #7b1fa2; }
+.facility-icon.elevator { background: #00838f; }
+.facility-info .fname { font-weight: 600; }
+.facility-info .fdetail { font-size: 0.75rem; color: #999; }
+.facility-source { font-size: 0.75rem; color: #999; margin-top: 0.5rem; }
+
 /* 响应式 */
 @media (max-width: 480px) {
   .header h1 { font-size: 1.5rem; }

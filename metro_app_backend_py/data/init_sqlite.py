@@ -53,6 +53,16 @@ conn.executescript("""
         end_km REAL,
         price REAL
     );
+
+    CREATE TABLE IF NOT EXISTS facilities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        station_name TEXT NOT NULL,
+        line TEXT NOT NULL,
+        facility_type TEXT NOT NULL CHECK(facility_type IN ('restroom','accessible_restroom','nursing_room','accessible_elevator','elevator','escalator','ticket_machine','service_center')),
+        floor TEXT DEFAULT '',
+        location_desc TEXT DEFAULT '',
+        source TEXT DEFAULT 'manual'
+    );
 """)
 
 # 插入种子数据
@@ -170,6 +180,59 @@ def seed_data():
     conn.executemany(
         "INSERT OR IGNORE INTO fare_rules (start_km, end_km, price) VALUES (?, ?, ?)",
         fare_rules,
+    )
+
+    # ═══ 站内设施数据 ═══
+    # 每个站至少录入卫生间，换乘大站补充更多设施
+    facility_data = [
+        # 1号线
+        ("苹果园", "1号线", "restroom", "B1", "站厅层中部"),
+        ("苹果园", "1号线", "accessible_elevator", "B1", "A口附近"),
+        ("公主坟", "1号线", "restroom", "B1", "站厅层西侧"),
+        ("军事博物馆", "1号线", "restroom", "B1", "站厅层中部"),
+        ("军事博物馆", "1号线", "accessible_elevator", "B1", "B口附近"),
+        ("复兴门", "1号线", "restroom", "B1", "站厅层中部"),
+        ("复兴门", "1号线", "accessible_elevator", "B1", "换乘通道南侧"),
+        ("复兴门", "1号线", "nursing_room", "B1", "无障碍卫生间旁"),
+        ("西单", "1号线", "restroom", "B1", "站厅层东侧"),
+        ("西单", "1号线", "accessible_elevator", "B1", "F口附近"),
+        ("西单", "1号线", "nursing_room", "B1", "站厅层中部"),
+        ("天安门东", "1号线", "restroom", "B1", "站厅层中部"),
+        ("天安门东", "1号线", "accessible_elevator", "B1", "B口附近"),
+        ("建国门", "1号线", "restroom", "B1", "站厅层西侧"),
+        ("建国门", "1号线", "accessible_elevator", "B1", "换乘通道东侧"),
+        ("建国门", "1号线", "nursing_room", "B1", "站厅层中部"),
+        ("国贸", "1号线", "restroom", "B1", "站厅层中部"),
+        ("国贸", "1号线", "accessible_elevator", "B1", "C口附近"),
+        ("国贸", "1号线", "nursing_room", "B1", "站厅层中部"),
+        ("四惠", "1号线", "restroom", "B1", "站厅层西侧"),
+        ("四惠", "1号线", "accessible_elevator", "B1", "A口附近"),
+        # 2号线
+        ("西直门", "2号线", "restroom", "B1", "站厅层中部"),
+        ("西直门", "2号线", "accessible_elevator", "B1", "换乘通道北侧"),
+        ("西直门", "2号线", "nursing_room", "B1", "站厅层中部"),
+        ("雍和宫", "2号线", "restroom", "B1", "站厅层东侧"),
+        ("东直门", "2号线", "restroom", "B1", "站厅层中部"),
+        ("东直门", "2号线", "accessible_elevator", "B1", "E口附近"),
+        ("前门", "2号线", "restroom", "B1", "站厅层中部"),
+        ("前门", "2号线", "accessible_elevator", "B1", "B口附近"),
+        ("宣武门", "2号线", "restroom", "B1", "站厅层西侧"),
+        ("宣武门", "2号线", "accessible_elevator", "B1", "换乘通道南侧"),
+        # 4号线
+        ("安河桥北", "4号线", "restroom", "B1", "站厅层中部"),
+        ("圆明园", "4号线", "restroom", "B1", "站厅层东侧"),
+        ("海淀黄庄", "4号线", "restroom", "B1", "站厅层中部"),
+        ("海淀黄庄", "4号线", "accessible_elevator", "B1", "B口附近"),
+        ("国家图书馆", "4号线", "restroom", "B1", "站厅层中部"),
+        ("国家图书馆", "4号线", "accessible_elevator", "B1", "D口附近"),
+        ("国家图书馆", "4号线", "nursing_room", "B1", "站厅层中部"),
+        ("北京南站", "4号线", "restroom", "B1", "站厅层中部"),
+        ("北京南站", "4号线", "accessible_elevator", "B1", "换乘大厅北侧"),
+        ("北京南站", "4号线", "nursing_room", "B1", "站厅层中部"),
+    ]
+    conn.executemany(
+        "INSERT OR IGNORE INTO facilities (station_name, line, facility_type, floor, location_desc) VALUES (?, ?, ?, ?, ?)",
+        facility_data,
     )
 
     print("Seed data inserted successfully.")

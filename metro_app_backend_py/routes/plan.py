@@ -1,8 +1,9 @@
-"""路径规划与开门提醒 API 路由。"""
+"""路径规划、开门提醒与站内设施 API 路由。"""
 
 from fastapi import APIRouter, Query, Request
 from services.raptor_engine import raptor_engine
 from services.door_reminder import door_reminder
+from services.station_facilities import station_facilities
 from middleware.rate_limiter import limiter, PLAN_LIMIT
 
 router = APIRouter()
@@ -32,3 +33,11 @@ def door_side(
     if result is None:
         return {"error": "站点不存在"}
     return result
+
+
+@router.get("/api/facilities")
+def get_facilities(
+    station: str = Query(..., description="站名"),
+    line: str = Query("", description="线路（可选）"),
+):
+    return station_facilities.query(station, line)

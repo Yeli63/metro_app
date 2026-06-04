@@ -142,6 +142,39 @@ document.getElementById('doorBtn').addEventListener('click', async () => {
   }
 });
 
+// ── 站内设施查询 ──
+document.getElementById('facilityStation').addEventListener('input', () => showSuggestions('facilityStation', 'facilitySuggestions'));
+document.getElementById('facilityBtn').addEventListener('click', async () => {
+  const station = document.getElementById('facilityStation').value.trim();
+  const resultEl = document.getElementById('facilityResult');
+  if (!station) { resultEl.innerHTML = '请输入站名'; resultEl.classList.add('show'); return; }
+
+  try {
+    const resp = await fetch(`${API}/api/facilities?station=${encodeURIComponent(station)}`);
+    const data = await resp.json();
+    if (!data.facilities || data.facilities.length === 0) {
+      resultEl.innerHTML = `<p>未找到「${station}」的设施数据</p>`;
+      resultEl.className = 'facility-result show';
+      return;
+    }
+    const items = data.facilities.map(f =>
+      `<div class="facility-item">
+        <div class="facility-icon ${f.type}">${f.icon}</div>
+        <div class="facility-info">
+          <div class="fname">${f.label}</div>
+          <div class="fdetail">${f.floor} ${f.location}</div>
+        </div>
+      </div>`
+    ).join('');
+    const source = data.source === 'amap' ? '（来自高德地图）' : '';
+    resultEl.innerHTML = `<h3>${data.station} ${data.line}</h3><div class="facility-grid">${items}</div><div class="facility-source">${source}</div>`;
+    resultEl.className = 'facility-result show';
+  } catch (err) {
+    resultEl.innerHTML = '查询失败';
+    resultEl.className = 'facility-result show';
+  }
+});
+
 // ── 用户认证 ──
 let authToken = localStorage.getItem('metro_token') || '';
 
