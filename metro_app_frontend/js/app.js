@@ -1,15 +1,26 @@
 // ── API 基础地址 ──
 const API = window.location.origin;
 
-// ── 站点自动补全 ──
-const allStations = ['苹果园','古城','八角游乐园','八宝山','玉泉路','五棵松','万寿路','公主坟','军事博物馆','木樨地','南礼士路','复兴门','西单','天安门西','天安门东','王府井','东单','建国门','永安里','国贸','大望路','四惠','四惠东','高碑店','传媒大学','双桥','管庄','八里桥','通州北苑','果园','九棵树','梨园','临河里','土桥','花庄','环球度假区','西直门','积水潭','鼓楼大街','安定门','雍和宫','东直门','东四十条','朝阳门','北京站','崇文门','前门','和平门','宣武门','长椿街','阜成门','车公庄','工人体育场','团结湖','朝阳公园','石佛营','北京朝阳站','姚家园','东坝南','东坝','东坝北'];
+// ── 站点自动补全（从API动态获取） ──
+let allStationsCache = [];
+
+async function loadStationList() {
+  try {
+    const resp = await fetch(API + '/api/stations');
+    const data = await resp.json();
+    const names = new Set();
+    data.stations.forEach(s => names.add(s.name));
+    allStationsCache = Array.from(names).sort();
+  } catch(e) { console.error('Station list load failed:', e); }
+}
+loadStationList();
 
 function showSuggestions(inputId, suggestId) {
   const input = document.getElementById(inputId);
   const suggest = document.getElementById(suggestId);
   const val = input.value.trim();
   if (!val) { suggest.classList.remove('show'); return; }
-  const matches = allStations.filter(s => s.includes(val));
+  const matches = allStationsCache.filter(s => s.includes(val)).slice(0, 10);
   if (matches.length === 0) { suggest.classList.remove('show'); return; }
   suggest.innerHTML = matches.map(s => `<div>${s}</div>`).join('');
   suggest.querySelectorAll('div').forEach(div => {
