@@ -66,174 +66,173 @@ conn.executescript("""
 """)
 
 # 插入种子数据
+# ═══ 种子数据辅助函数 ═══
 def seed_data():
-    # ═══ 北京地铁 1号线 ═══
-    line1_stations = [
-        ("line1_001", "苹果园",   "1号线", 39.926, 116.178, "side"),
-        ("line1_002", "公主坟",   "1号线", 39.908, 116.310, "island"),
-        ("line1_003", "军事博物馆", "1号线", 39.908, 116.327, "island"),
-        ("line1_004", "复兴门",   "1号线", 39.908, 116.357, "island"),
-        ("line1_005", "西单",     "1号线", 39.913, 116.374, "island"),
-        ("line1_006", "天安门东", "1号线", 39.914, 116.401, "island"),
-        ("line1_007", "建国门",   "1号线", 39.909, 116.436, "island"),
-        ("line1_008", "国贸",     "1号线", 39.909, 116.461, "island"),
-        ("line1_009", "四惠",     "1号线", 39.909, 116.496, "side"),
-    ]
-    conn.executemany(
-        "INSERT OR IGNORE INTO stations (id, name, line, lat, lng, platform_type) VALUES (?, ?, ?, ?, ?, ?)",
-        line1_stations,
-    )
-    for i in range(len(line1_stations) - 1):
-        conn.execute(
-            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-            (line1_stations[i][0], line1_stations[i + 1][0], "1号线", "up", 2, 1.3),
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-            (line1_stations[i + 1][0], line1_stations[i][0], "1号线", "down", 2, 1.3),
+    # 站名→ID 映射（用于换乘关系）
+    sid_map = {}
+
+    def add_line(line_name, stations):
+        """添加一条完整线路。stations: [(name, lat, lng, platform_type), ...]"""
+        ids = []
+        for i, (name, lat, lng, ptype) in enumerate(stations):
+            sid = f"{line_name}_{i+1:03d}"
+            ids.append(sid)
+            sid_map[(name, line_name)] = sid
+            conn.execute(
+                "INSERT OR IGNORE INTO stations (id, name, line, lat, lng, platform_type) VALUES (?, ?, ?, ?, ?, ?)",
+                (sid, name, line_name, lat, lng, ptype),
+            )
+        for i in range(len(ids) - 1):
+            conn.execute(
+                "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+                (ids[i], ids[i+1], line_name, "up", 2, 1.3),
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+                (ids[i+1], ids[i], line_name, "down", 2, 1.3),
+            )
+        # 环线闭合边（仅限2号线）
+        if line_name == "2号线" and len(ids) > 1:
+            conn.execute(
+                "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+                (ids[-1], ids[0], line_name, "up", 2, 1.1),
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
+                (ids[0], ids[-1], line_name, "down", 2, 1.1),
+            )
+
+    def add_transfer(name, line_a, line_b, walk=5):
+        """添加双向换乘关系。"""
+        a = sid_map.get((name, line_a))
+        b = sid_map.get((name, line_b))
+        if a and b:
+            conn.execute("INSERT OR IGNORE INTO transfers (station_id, from_line, to_line, walk_time, is_cross_platform) VALUES (?,?,?,?,?)", (a, line_a, line_b, walk, 0))
+            conn.execute("INSERT OR IGNORE INTO transfers (station_id, from_line, to_line, walk_time, is_cross_platform) VALUES (?,?,?,?,?)", (b, line_b, line_a, walk, 0))
+
+    def add_facilities(fac_list):
+        """批量添加设施。fac_list: [(name, line, type, floor, desc), ...]"""
+        conn.executemany(
+            "INSERT OR IGNORE INTO facilities (station_name, line, facility_type, floor, location_desc) VALUES (?,?,?,?,?)",
+            fac_list,
         )
 
-    # ═══ 北京地铁 2号线（环线北半圈） ═══
-    line2_stations = [
-        ("line2_001", "西直门", "2号线", 39.940, 116.355, "island"),
-        ("line2_002", "雍和宫", "2号线", 39.948, 116.417, "island"),
-        ("line2_003", "东直门", "2号线", 39.941, 116.435, "island"),
-        ("line2_004", "建国门", "2号线", 39.909, 116.436, "island"),
-        ("line2_005", "前门",   "2号线", 39.900, 116.398, "island"),
-        ("line2_006", "宣武门", "2号线", 39.899, 116.376, "island"),
-        ("line2_007", "复兴门", "2号线", 39.908, 116.357, "island"),
-    ]
-    conn.executemany(
-        "INSERT OR IGNORE INTO stations (id, name, line, lat, lng, platform_type) VALUES (?, ?, ?, ?, ?, ?)",
-        line2_stations,
-    )
-    for i in range(len(line2_stations) - 1):
-        conn.execute(
-            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-            (line2_stations[i][0], line2_stations[i + 1][0], "2号线", "up", 2, 1.1),
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-            (line2_stations[i + 1][0], line2_stations[i][0], "2号线", "down", 2, 1.1),
-        )
+    # ═══════════════════════════════════════════
+    # 北京地铁 1号线 · 八通线（苹果园 → 四惠东，23站）
+    # ═══════════════════════════════════════════
+    add_line("1号线", [
+        ("苹果园",   39.926, 116.178, "side"),
+        ("古城",     39.920, 116.192, "island"),
+        ("八角游乐园", 39.917, 116.205, "island"),
+        ("八宝山",   39.914, 116.218, "island"),
+        ("玉泉路",   39.911, 116.231, "island"),
+        ("五棵松",   39.909, 116.244, "island"),
+        ("万寿路",   39.907, 116.258, "island"),
+        ("公主坟",   39.908, 116.310, "island"),
+        ("军事博物馆", 39.908, 116.327, "island"),
+        ("木樨地",   39.907, 116.340, "island"),
+        ("南礼士路", 39.906, 116.350, "island"),
+        ("复兴门",   39.908, 116.357, "island"),
+        ("西单",     39.913, 116.374, "island"),
+        ("天安门西", 39.913, 116.388, "island"),
+        ("天安门东", 39.914, 116.401, "island"),
+        ("王府井",   39.916, 116.414, "island"),
+        ("东单",     39.915, 116.422, "island"),
+        ("建国门",   39.909, 116.436, "island"),
+        ("永安里",   39.909, 116.448, "island"),
+        ("国贸",     39.909, 116.461, "island"),
+        ("大望路",   39.908, 116.475, "island"),
+        ("四惠",     39.909, 116.496, "side"),
+        ("四惠东",   39.907, 116.510, "side"),
+    ])
 
-    # ═══ 北京地铁 4号线 ═══
-    line4_stations = [
-        ("line4_001", "安河桥北",   "4号线", 40.012, 116.272, "island"),
-        ("line4_002", "圆明园",     "4号线", 40.000, 116.303, "island"),
-        ("line4_003", "海淀黄庄",   "4号线", 39.976, 116.319, "island"),
-        ("line4_004", "国家图书馆", "4号线", 39.960, 116.327, "island"),
-        ("line4_005", "西直门",     "4号线", 39.940, 116.355, "island"),
-        ("line4_006", "西单",       "4号线", 39.913, 116.374, "side"),
-        ("line4_007", "宣武门",     "4号线", 39.899, 116.376, "island"),
-        ("line4_008", "北京南站",   "4号线", 39.865, 116.379, "side"),
-    ]
-    conn.executemany(
-        "INSERT OR IGNORE INTO stations (id, name, line, lat, lng, platform_type) VALUES (?, ?, ?, ?, ?, ?)",
-        line4_stations,
-    )
-    for i in range(len(line4_stations) - 1):
-        conn.execute(
-            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-            (line4_stations[i][0], line4_stations[i + 1][0], "4号线", "up", 2, 1.6),
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO edges (from_station, to_station, line, direction, travel_time, distance_km) VALUES (?, ?, ?, ?, ?, ?)",
-            (line4_stations[i + 1][0], line4_stations[i][0], "4号线", "down", 2, 1.6),
-        )
+    # ═══════════════════════════════════════════
+    # 北京地铁 2号线（环线，18站）
+    # ═══════════════════════════════════════════
+    add_line("2号线", [
+        ("西直门",   39.940, 116.355, "island"),
+        ("积水潭",   39.948, 116.373, "island"),
+        ("鼓楼大街", 39.950, 116.393, "island"),
+        ("安定门",   39.949, 116.408, "island"),
+        ("雍和宫",   39.948, 116.417, "island"),
+        ("东直门",   39.941, 116.435, "island"),
+        ("东四十条", 39.934, 116.433, "island"),
+        ("朝阳门",   39.926, 116.435, "island"),
+        ("建国门",   39.909, 116.436, "island"),
+        ("北京站",   39.904, 116.428, "island"),
+        ("崇文门",   39.901, 116.418, "island"),
+        ("前门",     39.900, 116.398, "island"),
+        ("和平门",   39.900, 116.384, "island"),
+        ("宣武门",   39.899, 116.376, "island"),
+        ("长椿街",   39.900, 116.364, "island"),
+        ("复兴门",   39.908, 116.357, "island"),
+        ("阜成门",   39.923, 116.356, "island"),
+        ("车公庄",   39.932, 116.355, "island"),
+    ])
+
+    # ═══════════════════════════════════════════
+    # 北京地铁 3号线（东四十条 → 东坝北，10站）
+    # ═══════════════════════════════════════════
+    add_line("3号线", [
+        ("东四十条",   39.934, 116.433, "island"),
+        ("工人体育场", 39.938, 116.445, "island"),
+        ("团结湖",     39.936, 116.461, "island"),
+        ("朝阳公园",   39.938, 116.475, "island"),
+        ("石佛营",     39.940, 116.490, "side"),
+        ("北京朝阳站", 39.942, 116.505, "island"),
+        ("姚家园",     39.944, 116.520, "side"),
+        ("东坝南",     39.950, 116.540, "island"),
+        ("东坝",       39.955, 116.555, "island"),
+        ("东坝北",     39.960, 116.570, "side"),
+    ])
 
     # ═══ 换乘关系 ═══
-    transfer_list = [
-        # 复兴门 1↔2
-        ("line1_004", "1号线", "2号线", 4, 0),
-        ("line2_007", "2号线", "1号线", 4, 0),
-        # 建国门 1↔2
-        ("line1_007", "1号线", "2号线", 5, 0),
-        ("line2_004", "2号线", "1号线", 5, 0),
-        # 西单 1↔4
-        ("line1_005", "1号线", "4号线", 3, 0),
-        ("line4_006", "4号线", "1号线", 3, 0),
-        # 西直门 2↔4
-        ("line2_001", "2号线", "4号线", 5, 0),
-        ("line4_005", "4号线", "2号线", 5, 0),
-        # 宣武门 2↔4
-        ("line2_006", "2号线", "4号线", 4, 0),
-        ("line4_007", "4号线", "2号线", 4, 0),
-    ]
-    for t in transfer_list:
-        conn.execute(
-            "INSERT OR IGNORE INTO transfers (station_id, from_line, to_line, walk_time, is_cross_platform) VALUES (?, ?, ?, ?, ?)",
-            t,
-        )
+    add_transfer("复兴门", "1号线", "2号线", 4)
+    add_transfer("建国门", "1号线", "2号线", 5)
+    add_transfer("东四十条", "2号线", "3号线", 5)
 
     # ═══ 北京地铁阶梯票价 ═══
-    fare_rules = [
-        (0, 6, 3),
-        (6, 12, 4),
-        (12, 22, 5),
-        (22, 32, 6),
-        (32, 52, 7),
-        (52, 72, 8),
-        (72, 92, 9),
-        (92, 999, 10),
-    ]
     conn.executemany(
         "INSERT OR IGNORE INTO fare_rules (start_km, end_km, price) VALUES (?, ?, ?)",
-        fare_rules,
+        [(0,6,3),(6,12,4),(12,22,5),(22,32,6),(32,52,7),(52,72,8),(72,92,9),(92,999,10)],
     )
 
-    # ═══ 站内设施数据 ═══
-    # 每个站至少录入卫生间，换乘大站补充更多设施
-    facility_data = [
-        # 1号线
-        ("苹果园", "1号线", "restroom", "B1", "站厅层中部"),
-        ("苹果园", "1号线", "accessible_elevator", "B1", "A口附近"),
-        ("公主坟", "1号线", "restroom", "B1", "站厅层西侧"),
-        ("军事博物馆", "1号线", "restroom", "B1", "站厅层中部"),
-        ("军事博物馆", "1号线", "accessible_elevator", "B1", "B口附近"),
-        ("复兴门", "1号线", "restroom", "B1", "站厅层中部"),
-        ("复兴门", "1号线", "accessible_elevator", "B1", "换乘通道南侧"),
-        ("复兴门", "1号线", "nursing_room", "B1", "无障碍卫生间旁"),
-        ("西单", "1号线", "restroom", "B1", "站厅层东侧"),
-        ("西单", "1号线", "accessible_elevator", "B1", "F口附近"),
-        ("西单", "1号线", "nursing_room", "B1", "站厅层中部"),
-        ("天安门东", "1号线", "restroom", "B1", "站厅层中部"),
-        ("天安门东", "1号线", "accessible_elevator", "B1", "B口附近"),
-        ("建国门", "1号线", "restroom", "B1", "站厅层西侧"),
-        ("建国门", "1号线", "accessible_elevator", "B1", "换乘通道东侧"),
-        ("建国门", "1号线", "nursing_room", "B1", "站厅层中部"),
-        ("国贸", "1号线", "restroom", "B1", "站厅层中部"),
-        ("国贸", "1号线", "accessible_elevator", "B1", "C口附近"),
-        ("国贸", "1号线", "nursing_room", "B1", "站厅层中部"),
-        ("四惠", "1号线", "restroom", "B1", "站厅层西侧"),
-        ("四惠", "1号线", "accessible_elevator", "B1", "A口附近"),
-        # 2号线
-        ("西直门", "2号线", "restroom", "B1", "站厅层中部"),
-        ("西直门", "2号线", "accessible_elevator", "B1", "换乘通道北侧"),
-        ("西直门", "2号线", "nursing_room", "B1", "站厅层中部"),
-        ("雍和宫", "2号线", "restroom", "B1", "站厅层东侧"),
-        ("东直门", "2号线", "restroom", "B1", "站厅层中部"),
-        ("东直门", "2号线", "accessible_elevator", "B1", "E口附近"),
-        ("前门", "2号线", "restroom", "B1", "站厅层中部"),
-        ("前门", "2号线", "accessible_elevator", "B1", "B口附近"),
-        ("宣武门", "2号线", "restroom", "B1", "站厅层西侧"),
-        ("宣武门", "2号线", "accessible_elevator", "B1", "换乘通道南侧"),
-        # 4号线
-        ("安河桥北", "4号线", "restroom", "B1", "站厅层中部"),
-        ("圆明园", "4号线", "restroom", "B1", "站厅层东侧"),
-        ("海淀黄庄", "4号线", "restroom", "B1", "站厅层中部"),
-        ("海淀黄庄", "4号线", "accessible_elevator", "B1", "B口附近"),
-        ("国家图书馆", "4号线", "restroom", "B1", "站厅层中部"),
-        ("国家图书馆", "4号线", "accessible_elevator", "B1", "D口附近"),
-        ("国家图书馆", "4号线", "nursing_room", "B1", "站厅层中部"),
-        ("北京南站", "4号线", "restroom", "B1", "站厅层中部"),
-        ("北京南站", "4号线", "accessible_elevator", "B1", "换乘大厅北侧"),
-        ("北京南站", "4号线", "nursing_room", "B1", "站厅层中部"),
-    ]
-    conn.executemany(
-        "INSERT OR IGNORE INTO facilities (station_name, line, facility_type, floor, location_desc) VALUES (?, ?, ?, ?, ?)",
-        facility_data,
-    )
+    # ═══ 站内设施（换乘大站+热门站） ═══
+    add_facilities([
+        ("复兴门","1号线","restroom","B1","站厅层中部"),
+        ("复兴门","1号线","accessible_elevator","B1","换乘通道南侧"),
+        ("复兴门","1号线","nursing_room","B1","无障碍卫生间旁"),
+        ("西单","1号线","restroom","B1","站厅层东侧"),
+        ("西单","1号线","accessible_elevator","B1","F口附近"),
+        ("西单","1号线","nursing_room","B1","站厅层中部"),
+        ("天安门东","1号线","restroom","B1","站厅层中部"),
+        ("天安门东","1号线","accessible_elevator","B1","B口附近"),
+        ("王府井","1号线","restroom","B1","站厅层中部"),
+        ("建国门","1号线","restroom","B1","站厅层西侧"),
+        ("建国门","1号线","accessible_elevator","B1","换乘通道东侧"),
+        ("建国门","1号线","nursing_room","B1","站厅层中部"),
+        ("国贸","1号线","restroom","B1","C口附近"),
+        ("国贸","1号线","accessible_elevator","B1","C口附近"),
+        ("国贸","1号线","nursing_room","B1","站厅层中部"),
+        ("四惠","1号线","restroom","B1","站厅层西侧"),
+        ("西直门","2号线","restroom","B1","站厅层中部"),
+        ("西直门","2号线","accessible_elevator","B1","换乘通道北侧"),
+        ("西直门","2号线","nursing_room","B1","站厅层中部"),
+        ("雍和宫","2号线","restroom","B1","站厅层东侧"),
+        ("东直门","2号线","restroom","B1","站厅层中部"),
+        ("东直门","2号线","accessible_elevator","B1","E口附近"),
+        ("东四十条","2号线","restroom","B1","站厅层中部"),
+        ("前门","2号线","restroom","B1","站厅层中部"),
+        ("崇文门","2号线","restroom","B1","站厅层西侧"),
+        ("宣武门","2号线","restroom","B1","站厅层西侧"),
+        ("宣武门","2号线","accessible_elevator","B1","换乘通道南侧"),
+        ("团结湖","3号线","restroom","B1","站厅层中部"),
+        ("朝阳公园","3号线","restroom","B1","站厅层东侧"),
+        ("北京朝阳站","3号线","restroom","B1","换乘大厅"),
+        ("北京朝阳站","3号线","accessible_elevator","B1","换乘大厅"),
+        ("北京朝阳站","3号线","nursing_room","B1","站厅层中部"),
+        ("东坝北","3号线","restroom","B1","站厅层中部"),
+    ])
 
     print("Seed data inserted successfully.")
 

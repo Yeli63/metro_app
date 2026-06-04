@@ -1,5 +1,5 @@
 // ── Leaflet 地图初始化 ──
-const LINE_COLORS = { '1号线': '#c23a30', '2号线': '#107dc0', '4号线': '#008c95' };
+const LINE_COLORS = { '1号线': '#c23a30', '2号线': '#107dc0', '3号线': '#e8791d' };
 const map = L.map('map').setView([39.92, 116.38], 12);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
