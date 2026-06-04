@@ -96,9 +96,9 @@ body {
   display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px;
   font-size: 0.75rem; font-weight: 600; color: white; margin: 0 0.2rem;
 }
-.line-1号线 { background: #f4c542; color: #333; }
-.line-2号线 { background: #1a73e8; }
-.line-3号线 { background: #e8710a; }
+.line-1号线 { background: #c23a30; }
+.line-2号线 { background: #107dc0; }
+.line-4号线 { background: #008c95; }
 .transfer-info {
   background: #fff3e0; padding: 0.5rem 0.8rem; border-radius: 8px;
   font-size: 0.85rem; margin: 0.3rem 0;

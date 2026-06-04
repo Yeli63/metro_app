@@ -2,7 +2,7 @@
 const API = window.location.origin;
 
 // ── 站点自动补全 ──
-const allStations = ['西朗','坑口','花地湾','芳村','黄沙','公园前','体育西路','纪念堂','机场北','嘉禾望岗','燕塘','广州东站'];
+const allStations = ['苹果园','公主坟','军事博物馆','复兴门','西单','天安门东','建国门','国贸','四惠','西直门','雍和宫','东直门','前门','宣武门','安河桥北','圆明园','海淀黄庄','国家图书馆','北京南站'];
 
 function showSuggestions(inputId, suggestId) {
   const input = document.getElementById(inputId);
