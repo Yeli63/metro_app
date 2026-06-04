@@ -1,11 +1,15 @@
 """路径规划、开门提醒与站内设施 API 路由。"""
 
+import sqlite3
+import os
 from fastapi import APIRouter, Query, Request
+from dotenv import load_dotenv
 from services.raptor_engine import raptor_engine
 from services.door_reminder import door_reminder
 from services.station_facilities import station_facilities
 from middleware.rate_limiter import limiter, PLAN_LIMIT
 
+load_dotenv()
 router = APIRouter()
 
 
@@ -41,3 +45,35 @@ def get_facilities(
     line: str = Query("", description="线路（可选）"),
 ):
     return station_facilities.query(station, line)
+
+
+@router.get("/api/stations")
+def get_stations():
+    """返回所有站点坐标，供地图渲染。"""
+    db_path = os.environ.get("SQLITE_PATH", "./data/metro_network.sqlite")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT id, name, line, lat, lng, platform_type FROM stations ORDER BY line, id"
+    ).fetchall()
+    conn.close()
+    return {"stations": [dict(r) for r in rows]}
+
+
+@router.get("/api/line_edges")
+def get_line_edges():
+    """返回所有线路边坐标，供地图绘制。"""
+    db_path = os.environ.get("SQLITE_PATH", "./data/metro_network.sqlite")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT e.from_station, e.to_station, e.line, e.direction,
+               s1.lat as from_lat, s1.lng as from_lng,
+               s2.lat as to_lat, s2.lng as to_lng
+        FROM edges e
+        JOIN stations s1 ON e.from_station = s1.id
+        JOIN stations s2 ON e.to_station = s2.id
+        ORDER BY e.line, e.direction
+    """).fetchall()
+    conn.close()
+    return {"edges": [dict(r) for r in rows]}

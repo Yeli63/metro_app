@@ -76,6 +76,7 @@ async function searchRoutes() {
       return;
     }
     renderRoutes(data.routes);
+    highlightRoute(data);
   } catch (err) {
     loadingEl.style.display = 'none';
     errorEl.textContent = '网络错误，请检查服务器是否启动';
@@ -169,6 +170,7 @@ document.getElementById('facilityBtn').addEventListener('click', async () => {
     const source = data.source === 'amap' ? '（来自高德地图）' : '';
     resultEl.innerHTML = `<h3>${data.station} ${data.line}</h3><div class="facility-grid">${items}</div><div class="facility-source">${source}</div>`;
     resultEl.className = 'facility-result show';
+    showFacilitiesOnMap(data);
   } catch (err) {
     resultEl.innerHTML = '查询失败';
     resultEl.className = 'facility-result show';
