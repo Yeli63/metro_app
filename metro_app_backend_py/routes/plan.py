@@ -43,7 +43,7 @@ def plan_route(
         amap_result = amap_planner.find_path(
             from_coords[0], from_coords[1],
             to_coords[0], to_coords[1],
-            strategy,
+            strategy, from_name=from_, to_name=to,
         )
         if amap_result and amap_result.get("routes"):
             return amap_result

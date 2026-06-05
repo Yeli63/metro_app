@@ -27,7 +27,8 @@ class AmapPlanner:
 
     def find_path(self, from_lat: float, from_lng: float,
                   to_lat: float, to_lng: float,
-                  strategy: str = "time", city: str = "北京") -> dict | None:
+                  strategy: str = "time", city: str = "北京",
+                  from_name: str = "", to_name: str = "") -> dict | None:
         """调用高德公交路径规划 API。
 
         Returns:
@@ -71,13 +72,21 @@ class AmapPlanner:
             if not routes:
                 return None
 
-            # 排序
-            key_map = {
-                "time": lambda r: (r["totalTime"], r["transfers"]),
-                "transfers": lambda r: (r["transfers"], r["totalTime"]),
-                "price": lambda r: (r["price"], r["totalTime"]),
-            }
-            routes.sort(key=key_map.get(strategy, key_map["time"]))
+            # 排序：优先起止站名匹配，其次按策略排
+            def route_score(r):
+                st = r["details"]["stations"]
+                match_bonus = 0
+                if from_name and st and st[0] == from_name:
+                    match_bonus -= 1000
+                if to_name and st and st[-1] == to_name:
+                    match_bonus -= 1000
+                if strategy == "transfers":
+                    return (match_bonus, r["transfers"], r["totalTime"])
+                elif strategy == "price":
+                    return (match_bonus, r["price"], r["totalTime"])
+                return (match_bonus, r["totalTime"], r["transfers"])
+
+            routes.sort(key=route_score)
 
             return {"routes": routes[:10], "source": "amap"}
 

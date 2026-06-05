@@ -62,4 +62,4 @@ if os.path.isdir(frontend_dir):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("server:app", host="127.0.0.1", port=int(os.environ.get("PORT", 3000)), reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=int(os.environ.get("PORT", 3000)), reload=True)
