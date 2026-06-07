@@ -88,6 +88,14 @@ class AmapPlanner:
 
             routes.sort(key=route_score)
 
+            # 过滤：最佳方案至少起止一站匹配，否则弃用高德、走本地
+            best = routes[0]
+            best_st = best["details"]["stations"]
+            from_ok = from_name and best_st and best_st[0] == from_name
+            to_ok = to_name and best_st and best_st[-1] == to_name
+            if not from_ok or not to_ok:
+                return None  # 触发本地 RAPTOR 兜底
+
             return {"routes": routes[:10], "source": "amap"}
 
         except Exception:
