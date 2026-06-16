@@ -219,8 +219,8 @@ class AmapPlanner:
 
     @staticmethod
     def _clean_station(name: str) -> str:
-        """清理站名（去掉'地铁站'后缀等）。"""
-        for suffix in ["地铁站", "(地铁)", "站"]:
+        """清理站名（去掉高德返回的'地铁站'多余后缀）。"""
+        for suffix in ["地铁站", "(地铁)"]:
             if name.endswith(suffix):
                 name = name[:-len(suffix)]
         return name
