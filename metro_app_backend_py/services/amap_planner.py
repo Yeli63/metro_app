@@ -183,6 +183,10 @@ class AmapPlanner:
 
                     seg_stations = full_stops[start_idx:end_idx + 1]
 
+                    # 去重：换乘站与前一段末站相同则跳过首站
+                    if seg_stations and all_stations and seg_stations[0] == all_stations[-1]:
+                        seg_stations = seg_stations[1:]
+
                     if seg_stations:
                         all_stations.extend(seg_stations)
                     if line_name:
