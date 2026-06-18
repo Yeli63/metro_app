@@ -38,7 +38,8 @@ def plan_route(
     from_coords = _get_station_coords(from_)
     to_coords = _get_station_coords(to)
 
-    # ② 高德 API 优先（需配置 AMAP_KEY 且站名能在本地库里找到坐标）
+    # ② 高德 API 优先
+    amap_routes = []
     if AMAP_KEY and from_coords and to_coords:
         amap_result = amap_planner.find_path(
             from_coords[0], from_coords[1],
@@ -46,14 +47,27 @@ def plan_route(
             strategy, from_name=from_, to_name=to,
         )
         if amap_result and amap_result.get("routes"):
-            return amap_result
+            amap_routes = amap_result["routes"]
+            amap_routes = [dict(r, source="amap") for r in amap_routes]
 
-    # ③ 高德不可用 → 本地 RAPTOR 兜底
-    result = raptor_engine.find_path(from_, to, strategy)
-    if "error" in result:
-        return {"error": result["error"]}
-    result["source"] = "local"
-    return result
+    # ③ 高德结果不足3条 → 补充本地RAPTOR路线（去重）
+    if len(amap_routes) < 3:
+        local_result = raptor_engine.find_path(from_, to, strategy)
+        if "routes" in local_result:
+            # 去重：排除与高德线路组合相同的本地路线
+            amap_line_sigs = {
+                tuple(r["lines"]) for r in amap_routes
+            }
+            for r in local_result["routes"]:
+                sig = tuple(r["lines"])
+                if sig not in amap_line_sigs:
+                    r["source"] = "local"
+                    amap_routes.append(r)
+                    amap_line_sigs.add(sig)
+
+    if not amap_routes:
+        return {"error": "未找到可达路线"}
+    return {"routes": amap_routes[:5]}
 
 
 @router.get("/api/door")
