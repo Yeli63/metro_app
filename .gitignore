@@ -28,3 +28,4 @@ build/
 # AI tools config (may contain API keys)
 .deepcode/
 metro_app_backend_py/data/*.bak
+metro_app_backend_py/data/metro_network.sqlite-*
