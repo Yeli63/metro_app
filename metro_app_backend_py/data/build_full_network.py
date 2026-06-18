@@ -386,6 +386,16 @@ def build():
             facility_type TEXT NOT NULL CHECK(facility_type IN ('restroom','accessible_restroom','nursing_room','accessible_elevator','elevator','escalator','ticket_machine','service_center')),
             floor TEXT DEFAULT '', location_desc TEXT DEFAULT '', source TEXT DEFAULT 'manual'
         );
+        CREATE TABLE IF NOT EXISTS favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_phone TEXT NOT NULL,
+            fav_type TEXT NOT NULL CHECK(fav_type IN ('route','station')),
+            from_name TEXT DEFAULT '',
+            to_name TEXT DEFAULT '',
+            station_name TEXT DEFAULT '',
+            lines TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
 
     sid_map = {}  # (name, line) → station_id

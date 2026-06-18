@@ -15,6 +15,7 @@ from config.db import connect_mongo, close_mongo
 from middleware.rate_limiter import limiter
 from routes.plan import router as plan_router
 from routes.auth import router as auth_router
+from routes.favorites import router as fav_router
 
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ app.add_middleware(
 # 路由
 app.include_router(plan_router)
 app.include_router(auth_router)
+app.include_router(fav_router)
 
 
 @app.get("/health")

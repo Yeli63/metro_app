@@ -11,6 +11,8 @@
 <header class="header">
   <h1>地铁智行</h1>
   <p class="subtitle">多策略换乘规划 · 开门提醒 · 票价计算</p>
+  <a href="/login.html" class="login-link" id="loginLink">登录</a>
+  <span class="user-info" id="userInfo" style="display:none"></span>
 </header>
 
 <main class="main">
@@ -95,22 +97,14 @@
     <div class="facility-result" id="facilityResult"></div>
   </section>
 
-  <!-- 用户登录（简化） -->
-  <section class="auth-card">
-    <h2>用户登录</h2>
-    <div class="form-row">
-      <div class="form-group">
-        <label for="phone">手机号</label>
-        <input type="text" id="phone" placeholder="11位手机号" maxlength="11">
-      </div>
-      <div class="form-group">
-        <label for="password">密码</label>
-        <input type="password" id="password" placeholder="输入密码">
-      </div>
-      <button class="search-btn" id="loginBtn">登录</button>
-      <button class="search-btn secondary" id="registerBtn">注册</button>
+  <!-- 我的收藏（登录后可见） -->
+  <section class="fav-card" id="favCard" style="display:none">
+    <h2>我的收藏</h2>
+    <div class="fav-tabs">
+      <span class="fav-tab active" onclick="showFavTab('routes')">收藏路线</span>
+      <span class="fav-tab" onclick="showFavTab('stations')">收藏站点</span>
     </div>
-    <div class="auth-result" id="authResult"></div>
+    <div class="fav-list" id="favList"></div>
   </section>
 </main>
 

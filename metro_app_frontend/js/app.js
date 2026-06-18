@@ -100,6 +100,7 @@ function renderRoutes(routes) {
   resultsEl.innerHTML = routes.map((r, i) => {
     const isBest = i === 0;
     const badgeHtml = isBest ? '<span class="route-badge green">推荐</span>' : '';
+    const starBtn = `<span class="fav-star" onclick="addFav('route','${r.details.stations[0]}','${r.details.stations[r.details.stations.length-1]}','','${r.lines.join(',')}')" title="收藏路线">&#9734;</span>`;
     const transferBadges = r.details.transfers.map(t =>
       `<span class="transfer-info">换乘: ${t.station} (${t.fromLine} → ${t.toLine}) 步行${t.walkTime}分钟</span>`
     ).join('');
@@ -119,7 +120,7 @@ function renderRoutes(routes) {
             <div class="stat"><div class="stat-val">${r.transfers}次</div><div class="stat-lbl">换乘</div></div>
             <div class="stat"><div class="stat-val">¥${r.price}</div><div class="stat-lbl">票价</div></div>
           </div>
-          ${badgeHtml}
+          ${badgeHtml} ${starBtn}
         </div>
         <div class="station-line">${stationHtml}</div>
         <div style="margin-top:0.3rem">
@@ -188,53 +189,106 @@ document.getElementById('facilityBtn').addEventListener('click', async () => {
   }
 });
 
-// ── 用户认证 ──
+// ── 收藏功能 ──
 let authToken = localStorage.getItem('metro_token') || '';
+let currentFavTab = 'routes';
+let allFavorites = [];
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const phone = document.getElementById('phone').value.trim();
-  const password = document.getElementById('password').value;
-  const resultEl = document.getElementById('authResult');
-  if (phone.length !== 11) { resultEl.innerHTML = '请输入正确的11位手机号'; resultEl.className = 'auth-result error show'; return; }
-  if (!password) { resultEl.innerHTML = '请输入密码'; resultEl.className = 'auth-result error show'; return; }
-
-  try {
-    const resp = await fetch(`${API}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, password }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) { resultEl.innerHTML = data.detail || '登录失败'; resultEl.className = 'auth-result error show'; return; }
-    authToken = data.token;
-    localStorage.setItem('metro_token', authToken);
-    resultEl.innerHTML = `${data.user.nickname || phone} — 登录成功`;
-    resultEl.className = 'auth-result success show';
-  } catch (err) {
-    resultEl.innerHTML = '服务器连接失败';
-    resultEl.className = 'auth-result error show';
+function checkLogin() {
+  const link = document.getElementById('loginLink');
+  const info = document.getElementById('userInfo');
+  const card = document.getElementById('favCard');
+  if (authToken) {
+    const phone = localStorage.getItem('metro_phone') || '';
+    link.style.display = 'none';
+    info.style.display = 'inline';
+    info.innerHTML = phone + ' | <a href=\"#\" onclick=\"logout()\" style=\"color:#fff\">退出</a>';
+    card.style.display = 'block';
+    loadFavorites();
+  } else {
+    link.style.display = 'inline';
+    info.style.display = 'none';
+    card.style.display = 'none';
   }
-});
+}
 
-document.getElementById('registerBtn').addEventListener('click', async () => {
-  const phone = document.getElementById('phone').value.trim();
-  const password = document.getElementById('password').value;
-  const resultEl = document.getElementById('authResult');
-  if (phone.length !== 11) { resultEl.innerHTML = '请输入正确的11位手机号'; resultEl.className = 'auth-result error show'; return; }
-  if (password.length < 6) { resultEl.innerHTML = '密码至少6位'; resultEl.className = 'auth-result error show'; return; }
+function logout() {
+  localStorage.removeItem('metro_token');
+  localStorage.removeItem('metro_phone');
+  authToken = '';
+  checkLogin();
+}
 
+async function loadFavorites() {
+  if (!authToken) return;
   try {
-    const resp = await fetch(`${API}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, password, nickname: phone }),
+    const resp = await fetch(API + '/api/favorites', {
+      headers: { 'Authorization': 'Bearer ' + authToken }
     });
+    if (!resp.ok) { if (resp.status === 401) logout(); return; }
     const data = await resp.json();
-    if (!resp.ok) { resultEl.innerHTML = data.detail || '注册失败'; resultEl.className = 'auth-result error show'; return; }
-    resultEl.innerHTML = `注册成功 — ${data.phone}`;
-    resultEl.className = 'auth-result success show';
-  } catch (err) {
-    resultEl.innerHTML = '服务器连接失败 (MongoDB 可能需要启动)';
-    resultEl.className = 'auth-result error show';
+    allFavorites = data.favorites || [];
+    renderFavorites();
+  } catch(e) {}
+}
+
+function showFavTab(tab) {
+  currentFavTab = tab;
+  document.querySelectorAll('.fav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.fav-tab')[tab === 'routes' ? 0 : 1].classList.add('active');
+  renderFavorites();
+}
+
+function renderFavorites() {
+  const el = document.getElementById('favList');
+  const items = allFavorites.filter(f => f.fav_type === currentFavTab);
+  if (items.length === 0) {
+    el.innerHTML = '<div class=\"fav-empty\">暂无收藏</div>'; return;
   }
-});
+  el.innerHTML = items.map(f => {
+    if (f.fav_type === 'route') {
+      return `<div class=\"fav-item\">
+        <span>${f.from_name} → ${f.to_name} (${f.lines || ''})</span>
+        <span><span class=\"fav-use\" onclick=\"useRoute('${f.from_name}','${f.to_name}')\">查询</span>
+        <span class=\"fav-del\" onclick=\"delFav(${f.id})\">删除</span></span></div>`;
+    } else {
+      return `<div class=\"fav-item\">
+        <span>${f.station_name} (${f.lines || ''})</span>
+        <span><span class=\"fav-use\" onclick=\"useStation('${f.station_name}')\">设起点</span>
+        <span class=\"fav-del\" onclick=\"delFav(${f.id})\">删除</span></span></div>`;
+    }
+  }).join('');
+}
+
+function useRoute(from, to) {
+  document.getElementById('fromStation').value = from;
+  document.getElementById('toStation').value = to;
+  searchRoutes();
+}
+
+function useStation(name) {
+  document.getElementById('fromStation').value = name;
+}
+
+async function addFav(type, from, to, station, lines) {
+  if (!authToken) { window.location.href = '/login.html'; return; }
+  try {
+    await fetch(API + '/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+      body: JSON.stringify({ fav_type: type, from_name: from, to_name: to, station_name: station, lines: lines.join(',') }),
+    });
+    loadFavorites();
+  } catch(e) {}
+}
+
+async function delFav(id) {
+  try {
+    await fetch(API + '/api/favorites/' + id, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken }
+    });
+    loadFavorites();
+  } catch(e) {}
+}
+
+checkLogin();

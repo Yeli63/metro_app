@@ -1,10 +1,9 @@
-"""用户模型 — Pydantic 请求/响应模型 + MongoDB 操作。"""
+"""用户模型 — Pydantic 请求/响应模型 + SQLite 存储（MongoDB 可选）。"""
 
+import sqlite3
 import os
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
-from motor.motor_asyncio import AsyncIOMotorClient
-from config.db import mongo_client
 
 
 # ── 请求模型 ──
@@ -20,39 +19,50 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
 
 
-# ── 响应模型 ──
-
 class UserResponse(BaseModel):
     phone: str
     nickname: str
     created_at: datetime
 
 
-# ── MongoDB 操作 ──
+# ── SQLite 存储 ──
 
-def _get_users_collection():
-    client: AsyncIOMotorClient = mongo_client
-    if client is None:
-        raise RuntimeError("MongoDB 未连接")
-    db = client[os.environ.get("MONGO_DB", "metro_app")]
-    return db["users"]
+def _get_db():
+    db_path = os.environ.get("SQLITE_PATH", "./data/metro_network.sqlite")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    # 确保 users 表存在
+    conn.execute("""CREATE TABLE IF NOT EXISTS users (
+        phone TEXT PRIMARY KEY,
+        hashed_password TEXT NOT NULL,
+        nickname TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    conn.commit()
+    return conn
 
 
 async def create_user(phone: str, hashed_password: str, nickname: str = "") -> dict:
-    col = _get_users_collection()
-    existing = await col.find_one({"phone": phone})
-    if existing:
-        return None
-    doc = {
-        "phone": phone,
-        "hashed_password": hashed_password,
-        "nickname": nickname or phone,
-        "created_at": datetime.now(timezone.utc),
-    }
-    await col.insert_one(doc)
-    return doc
+    conn = _get_db()
+    try:
+        existing = conn.execute("SELECT phone FROM users WHERE phone = ?", (phone,)).fetchone()
+        if existing:
+            return None
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT INTO users (phone, hashed_password, nickname, created_at) VALUES (?,?,?,?)",
+            (phone, hashed_password, nickname or phone, now),
+        )
+        conn.commit()
+        return {"phone": phone, "hashed_password": hashed_password, "nickname": nickname or phone, "created_at": now}
+    finally:
+        conn.close()
 
 
 async def find_user_by_phone(phone: str) -> dict | None:
-    col = _get_users_collection()
-    return await col.find_one({"phone": phone})
+    conn = _get_db()
+    try:
+        row = conn.execute("SELECT * FROM users WHERE phone = ?", (phone,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
