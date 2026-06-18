@@ -257,19 +257,23 @@ document.addEventListener('click', async (e) => {
   if (!star) return;
   e.preventDefault();
   if (!authToken) { window.location.href = '/login.html'; return; }
+  star.style.pointerEvents = 'none';
   const from = star.dataset.from || '';
   const to = star.dataset.to || '';
   const lines = star.dataset.lines || '';
   try {
-    await fetch(API + '/api/favorites', {
+    const resp = await fetch(API + '/api/favorites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
       body: JSON.stringify({ fav_type: 'route', from_name: from, to_name: to, station_name: '', lines }),
     });
+    if (resp.status === 401) { logout(); return; }
+    if (!resp.ok) { console.error('Fav failed:', resp.status); return; }
     star.innerHTML = '&#9733;';
     star.classList.add('saved');
-    loadFavorites();
-  } catch(e) {}
+    await loadFavorites();
+  } catch(e) { console.error('Fav error:', e); }
+  finally { star.style.pointerEvents = ''; }
 });
 
 async function addFav(type, from, to, station, lines) {
