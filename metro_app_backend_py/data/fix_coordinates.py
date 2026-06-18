@@ -1,4 +1,13 @@
-"""用高德地理编码批量修正站点坐标。"""
+"""
+用高德地理编码批量修正站点坐标。
+============================================================
+原创代码 | 地铁智行课程项目
+第三方API: 高德地理编码 (v3/geocode/geo)
+  - 用途: 将站名转换为精确经纬度坐标
+  - 调用量: 377次 (一次性建库脚本)
+依赖: httpx (第三方库, MIT)
+============================================================
+"""
 
 import sqlite3
 import os
@@ -23,6 +32,7 @@ def haversine_km(lat1, lng1, lat2, lng2):
 def geocode(name):
     if not AMAP_KEY: return None
     try:
+        # [第三方API调用] 高德地理编码 API
         resp = httpx.get("https://restapi.amap.com/v3/geocode/geo", params={
             "key": AMAP_KEY, "address": f"北京市{name}地铁站", "city": "北京"
         }, timeout=8)

@@ -1,6 +1,11 @@
-"""站内设施查询服务。
-
-优先从本地 SQLite 查询，未命中时通过高德 POI API 补充。
+"""
+站内设施查询服务 — 本地 SQLite 优先，高德 POI API 兜底。
+============================================================
+原创代码 | 地铁智行课程项目
+第三方API: 高德 POI 周边搜索 (v3/place/around)
+  - 用途: 查询地铁站附近的卫生间、无障碍设施、母婴室
+依赖: httpx (第三方库, MIT)
+============================================================
 """
 
 import sqlite3
@@ -103,6 +108,7 @@ class StationFacilities:
 
         try:
             # 高德 POI 周边搜索（卫生间 + 无障碍设施 + 母婴室）
+            # [第三方API调用] 高德 POI 周边搜索
             resp = httpx.get("https://restapi.amap.com/v3/place/around", params={
                 "key": self.amap_key,
                 "location": f"{row['lng']},{row['lat']}",

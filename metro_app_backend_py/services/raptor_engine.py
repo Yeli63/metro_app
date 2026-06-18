@@ -1,6 +1,10 @@
-"""RAPTOR 路径规划引擎。
-
-迭代式实现：支持 0~N 次换乘的路径搜索。
+"""
+RAPTOR 路径规划引擎 — 迭代式实现，支持 0~N 次换乘。
+============================================================
+原创代码 | 地铁智行课程项目
+算法参考: RAPTOR (Round-based Public Transit Optimized Router)
+依赖: Python stdlib (sqlite3, collections, heapq, math, os)
+============================================================
 """
 
 import sqlite3

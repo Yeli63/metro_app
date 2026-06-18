@@ -1,7 +1,13 @@
-"""高德地图公交路径规划 → 本地 RAPTOR 兜底。
-
-优先调用高德公交路径规划 API（实时数据、真实耗时），
-配额不足或调用失败时自动降级到本地 RAPTOR 引擎。
+"""
+高德地图公交路径规划 → 本地 RAPTOR 兜底。
+============================================================
+原创代码 | 地铁智行课程项目
+第三方API: 高德地图 Web服务 API (v3/direction/transit/integrated)
+  - 文档: https://lbs.amap.com/api/webservice/guide/api/direction
+  - 用途: 获取实时公交/地铁路径规划方案
+  - 配额: 个人开发者 100次/天 (未使用SDK, 仅HTTP调用)
+依赖: httpx (第三方库, MIT), re (stdlib)
+============================================================
 """
 
 import os
@@ -41,6 +47,7 @@ class AmapPlanner:
         amap_strategy = STRATEGY_MAP.get(strategy, 0)
 
         try:
+            # [第三方API调用] 高德公交路径规划 HTTP API
             resp = httpx.get(AMAP_DIRECTION_URL, params={
                 "key": AMAP_KEY,
                 "origin": f"{from_lng},{from_lat}",
