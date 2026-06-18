@@ -41,7 +41,7 @@ class DoorReminder:
             direction: 行驶方向 'up' | 'down'
 
         Returns:
-            {"station": "体育西路", "line": "1号线", "direction": "up", "doorSide": "left"}
+            {"station": "复兴门", "line": "1号线", "direction": "up", "doorSide": "left"}
             或 None（站点不存在）
         """
         conn = self._get_conn()
