@@ -194,21 +194,7 @@ let authToken = localStorage.getItem('metro_token') || '';
 let allFavorites = [];
 
 function checkLogin() {
-  const link = document.getElementById('loginLink');
-  const info = document.getElementById('userInfo');
-  const card = document.getElementById('favCard');
-  if (authToken) {
-    const phone = localStorage.getItem('metro_phone') || '';
-    link.style.display = 'none';
-    info.style.display = 'inline';
-    info.innerHTML = phone + ' | <a href=\"#\" onclick=\"logout()\" style=\"color:#fff\">退出</a>';
-    card.style.display = 'block';
-    loadFavorites();
-  } else {
-    link.style.display = 'inline';
-    info.style.display = 'none';
-    card.style.display = 'none';
-  }
+  // 账号系统已隐藏，不执行任何UI操作
 }
 
 function logout() {
