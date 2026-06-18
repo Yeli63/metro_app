@@ -100,7 +100,7 @@ function renderRoutes(routes) {
   resultsEl.innerHTML = routes.map((r, i) => {
     const isBest = i === 0;
     const badgeHtml = isBest ? '<span class="route-badge green">推荐</span>' : '';
-    const starBtn = `<span class="fav-star" onclick="addFav('route','${r.details.stations[0]}','${r.details.stations[r.details.stations.length-1]}','','${r.lines.join(',')}')" title="收藏路线">&#9734;</span>`;
+    const starBtn = `<span class="fav-star" data-from="${r.details.stations[0]}" data-to="${r.details.stations[r.details.stations.length-1]}" data-lines="${r.lines.join(',')}" title="收藏路线">&#9734;</span>`;
     const transferBadges = r.details.transfers.map(t =>
       `<span class="transfer-info">换乘: ${t.station} (${t.fromLine} → ${t.toLine}) 步行${t.walkTime}分钟</span>`
     ).join('');
@@ -251,13 +251,34 @@ function useRoute(from, to) {
   searchRoutes();
 }
 
+// 事件委托：点击收藏星标
+document.addEventListener('click', async (e) => {
+  const star = e.target.closest('.fav-star');
+  if (!star) return;
+  e.preventDefault();
+  if (!authToken) { window.location.href = '/login.html'; return; }
+  const from = star.dataset.from || '';
+  const to = star.dataset.to || '';
+  const lines = star.dataset.lines || '';
+  try {
+    await fetch(API + '/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+      body: JSON.stringify({ fav_type: 'route', from_name: from, to_name: to, station_name: '', lines }),
+    });
+    star.innerHTML = '&#9733;';
+    star.classList.add('saved');
+    loadFavorites();
+  } catch(e) {}
+});
+
 async function addFav(type, from, to, station, lines) {
   if (!authToken) { window.location.href = '/login.html'; return; }
   try {
     await fetch(API + '/api/favorites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-      body: JSON.stringify({ fav_type: type, from_name: from, to_name: to, station_name: station, lines: lines.join(',') }),
+      body: JSON.stringify({ fav_type: type, from_name: from, to_name: to, station_name: station, lines }),
     });
     loadFavorites();
   } catch(e) {}
