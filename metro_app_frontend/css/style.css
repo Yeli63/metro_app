@@ -142,9 +142,6 @@ body {
 /* 收藏 */
 .fav-card { background: white; border-radius: 12px; padding: 1.2rem; margin-bottom: 1rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.fav-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
-.fav-tab { cursor: pointer; padding: 0.3rem 0.8rem; font-size: 0.85rem; color: #999; border-radius: 4px; }
-.fav-tab.active { color: #1a73e8; background: #e8f0fe; font-weight: 600; }
 .fav-item { display: flex; justify-content: space-between; align-items: center;
   padding: 0.5rem 0; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
 .fav-item:last-child { border-bottom: none; }

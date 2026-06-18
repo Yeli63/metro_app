@@ -191,7 +191,6 @@ document.getElementById('facilityBtn').addEventListener('click', async () => {
 
 // ── 收藏功能 ──
 let authToken = localStorage.getItem('metro_token') || '';
-let currentFavTab = 'routes';
 let allFavorites = [];
 
 function checkLogin() {
@@ -232,42 +231,24 @@ async function loadFavorites() {
   } catch(e) {}
 }
 
-function showFavTab(tab) {
-  currentFavTab = tab;
-  document.querySelectorAll('.fav-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.fav-tab')[tab === 'routes' ? 0 : 1].classList.add('active');
-  renderFavorites();
-}
-
 function renderFavorites() {
   const el = document.getElementById('favList');
-  const items = allFavorites.filter(f => f.fav_type === currentFavTab);
+  const items = allFavorites.filter(f => f.fav_type === 'route');
   if (items.length === 0) {
-    el.innerHTML = '<div class=\"fav-empty\">暂无收藏</div>'; return;
+    el.innerHTML = '<div class=\"fav-empty\">暂无收藏路线</div>'; return;
   }
-  el.innerHTML = items.map(f => {
-    if (f.fav_type === 'route') {
-      return `<div class=\"fav-item\">
-        <span>${f.from_name} → ${f.to_name} (${f.lines || ''})</span>
-        <span><span class=\"fav-use\" onclick=\"useRoute('${f.from_name}','${f.to_name}')\">查询</span>
-        <span class=\"fav-del\" onclick=\"delFav(${f.id})\">删除</span></span></div>`;
-    } else {
-      return `<div class=\"fav-item\">
-        <span>${f.station_name} (${f.lines || ''})</span>
-        <span><span class=\"fav-use\" onclick=\"useStation('${f.station_name}')\">设起点</span>
-        <span class=\"fav-del\" onclick=\"delFav(${f.id})\">删除</span></span></div>`;
-    }
-  }).join('');
+  el.innerHTML = items.map(f =>
+    `<div class=\"fav-item\">
+      <span>${f.from_name} → ${f.to_name} (${f.lines || ''})</span>
+      <span><span class=\"fav-use\" onclick=\"useRoute('${f.from_name}','${f.to_name}')\">查询</span>
+      <span class=\"fav-del\" onclick=\"delFav(${f.id})\">删除</span></span></div>`
+  ).join('');
 }
 
 function useRoute(from, to) {
   document.getElementById('fromStation').value = from;
   document.getElementById('toStation').value = to;
   searchRoutes();
-}
-
-function useStation(name) {
-  document.getElementById('fromStation').value = name;
 }
 
 async function addFav(type, from, to, station, lines) {
