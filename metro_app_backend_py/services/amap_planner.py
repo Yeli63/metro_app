@@ -72,6 +72,13 @@ class AmapPlanner:
             if not routes:
                 return None
 
+            # 过滤：丢弃终点不是目标站的路线
+            if to_name:
+                routes = [r for r in routes
+                          if r["details"]["stations"] and r["details"]["stations"][-1] == to_name]
+            if not routes:
+                return None
+
             # 排序：优先起止站名匹配，其次按策略排
             def route_score(r):
                 st = r["details"]["stations"]
@@ -119,42 +126,39 @@ class AmapPlanner:
         return False
 
     def _parse_transit(self, transit: dict) -> dict | None:
-        """将高德公交方案转为我们的统一格式(仅保留地铁段)。"""
+        """将高德公交方案转为统一格式(仅保留地铁段)。"""
         segments = transit.get("segments", [])
         if not segments:
             return None
 
         total_time = 0
-        lines = []
-        all_stations = []
-        transfer_list = []
-        transfer_count = 0
-        total_walk = 0
+        metro_segments = []  # 收集所有地铁段: [(line_name, stations, duration_min), ...]
+        pending_walk = 0     # 当前累积的步行时间(用于换乘)
         price = float(transit.get("cost", 0))
-        has_metro = False
 
         for seg in segments:
             bus = seg.get("bus", {})
             buslines = bus.get("buslines", [])
             walking = seg.get("walking", {})
 
+            # 步行时间：作为下一次换乘的步行成本
             if walking:
                 walk_sec = int(walking.get("duration", 0))
                 walk_time = max(1, walk_sec // 60)
                 total_time += walk_time
-                total_walk += walk_time
+                pending_walk += walk_time
 
             if buslines:
                 for bl in buslines:
                     line_name = bl.get("name", "")
                     if not self._is_metro(line_name):
-                        continue  # 跳过公交段
-                    has_metro = True
+                        continue
+
                     seg_sec = int(bl.get("duration", 0))
                     seg_time = max(1, seg_sec // 60)
                     total_time += seg_time
 
-                    # 途经站点 — 裁剪到实际起止站之间
+                    # 站点解析
                     stops = bl.get("via_stops", [])
                     departure = bl.get("departure_stop", {})
                     arrival = bl.get("arrival_stop", {})
@@ -162,7 +166,6 @@ class AmapPlanner:
                     dep_name = self._clean_station(departure.get("name", ""))
                     arr_name = self._clean_station(arrival.get("name", ""))
 
-                    # 构建完整站序: departure + via_stops + arrival
                     full_stops = []
                     if dep_name:
                         full_stops.append(dep_name)
@@ -170,51 +173,50 @@ class AmapPlanner:
                         n = self._clean_station(s.get("name", ""))
                         if n:
                             full_stops.append(n)
-                    if arr_name and arr_name != full_stops[-1] if full_stops else True:
+                    if arr_name and (not full_stops or arr_name != full_stops[-1]):
                         full_stops.append(arr_name)
 
-                    # 裁剪: 找到 departure 和 arrival 在列表中的位置
-                    start_idx = 0
-                    end_idx = len(full_stops) - 1
-                    if dep_name in full_stops:
-                        start_idx = full_stops.index(dep_name)
-                    if arr_name in full_stops:
-                        end_idx = full_stops.index(arr_name)
-
+                    # 裁剪到实际乘坐区间
+                    start_idx = full_stops.index(dep_name) if dep_name in full_stops else 0
+                    end_idx = full_stops.index(arr_name) if arr_name in full_stops else len(full_stops) - 1
                     seg_stations = full_stops[start_idx:end_idx + 1]
 
-                    # 去重：换乘站与前一段末站相同则跳过首站
-                    if seg_stations and all_stations and seg_stations[0] == all_stations[-1]:
-                        seg_stations = seg_stations[1:]
+                    metro_segments.append((line_name, seg_stations, seg_time, pending_walk))
+                    pending_walk = 0  # 步行已关联到这段
 
-                    if seg_stations:
-                        all_stations.extend(seg_stations)
-                    if line_name:
-                        lines.append(line_name)
-
-            # 换乘检测
-            if len(lines) > len(transfer_list) + 1:
-                transfer_count += 1
-                prev_line = lines[-2] if len(lines) >= 2 else ""
-                curr_line = lines[-1] if lines else ""
-                # 在 all_stations 中找连接点
-                if all_stations:
-                    transfer_list.append({
-                        "station": all_stations[-1] if all_stations else "换乘站",
-                        "fromLine": prev_line,
-                        "toLine": curr_line,
-                        "walkTime": total_walk,
-                    })
-                total_walk = 0
-
-        if not has_metro or not all_stations:
+        if not metro_segments:
             return None
+
+        # 拼接站点列表并生成换乘信息
+        all_stations = []
+        lines = []
+        transfer_list = []
+
+        for i, (line, stns, dur, walk) in enumerate(metro_segments):
+            # 去重首站(与前一段末站相同)
+            if all_stations and stns and stns[0] == all_stations[-1]:
+                stns = stns[1:]
+
+            all_stations.extend(stns)
+            lines.append(line)
+
+            # 换乘=上一段末站是当前段首站的同名站
+            if i > 0:
+                prev_last = metro_segments[i - 1][1][-1] if metro_segments[i - 1][1] else ""
+                curr_first = metro_segments[i][1][0] if metro_segments[i][1] else ""
+                transfer_station = prev_last if prev_last == curr_first else metro_segments[i][1][0]
+                transfer_list.append({
+                    "station": transfer_station,
+                    "fromLine": metro_segments[i - 1][0],
+                    "toLine": line,
+                    "walkTime": walk,
+                })
 
         return {
             "totalTime": total_time,
-            "transfers": transfer_count,
+            "transfers": len(transfer_list),
             "price": price if price > 0 else 3.0,
-            "lines": list(dict.fromkeys(lines)),  # 去重保序
+            "lines": lines,
             "details": {
                 "stations": all_stations,
                 "transfers": transfer_list,
