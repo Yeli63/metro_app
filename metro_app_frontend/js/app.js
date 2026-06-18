@@ -180,7 +180,8 @@ document.getElementById('facilityBtn').addEventListener('click', async () => {
       </div>`
     ).join('');
     const source = data.source === 'amap' ? '（来自高德地图）' : '';
-    resultEl.innerHTML = `<h3>${data.station} ${data.line}</h3><div class="facility-grid">${items}</div><div class="facility-source">${source}</div>`;
+    const lineText = data.line ? ` ${data.line}` : '';
+    resultEl.innerHTML = `<h3>${data.station}${lineText}</h3><div class="facility-grid">${items}</div><div class="facility-source">${source}</div>`;
     resultEl.className = 'facility-result show';
     showFacilitiesOnMap(data);
   } catch (err) {

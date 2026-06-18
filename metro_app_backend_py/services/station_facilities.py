@@ -83,15 +83,14 @@ class StationFacilities:
 
             # 本地有数据直接返回
             if facilities:
-                return {"station": station_name, "line": line or "全部线路", "facilities": facilities, "source": "local"}
+                return {"station": station_name, "line": line or "", "facilities": facilities, "source": "local"}
 
-            # 本地无数据 → 尝试高德 API 兜底
             if self.amap_key:
                 amap_result = self._query_amap(conn, station_name)
                 if amap_result:
-                    return {"station": station_name, "line": line or "全部线路", "facilities": amap_result, "source": "amap"}
+                    return {"station": station_name, "line": line or "", "facilities": amap_result, "source": "amap"}
 
-            return {"station": station_name, "line": line or "全部线路", "facilities": [], "source": "none"}
+            return {"station": station_name, "line": line or "", "facilities": [], "source": "none"}
 
         finally:
             conn.close()
