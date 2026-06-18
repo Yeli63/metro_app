@@ -191,7 +191,24 @@ class RaptorEngine:
                       path: list, lines: list, tlist: list, strategy: str) -> dict:
         from services.fare_calculator import fare_calculator
 
-        # 按实际路径距离计算票价（不用直线距离）
+        dest_name = self._get_station_name(conn, dest_id)
+
+        # 过滤冗余换乘：终点站的换乘是多余的(已经到了不需要再换)
+        while tlist and tlist[-1]["station"] == dest_name:
+            tlist.pop()
+            transfers -= 1
+            if len(lines) > 1:
+                lines.pop()
+
+        # 去重连续重复站名(换乘站不同线路ID导致)
+        station_names = []
+        for sid in path:
+            name = self._get_station_name(conn, sid)
+            if station_names and name == station_names[-1]:
+                continue
+            station_names.append(name)
+
+        # 按实际路径距离计算票价
         path_dist, _ = fare_calculator.calculate_path_distance(conn, path)
         price = fare_calculator._get_fare_by_distance(conn, path_dist)
 
@@ -201,7 +218,7 @@ class RaptorEngine:
             "price": price,
             "lines": lines,
             "details": {
-                "stations": [self._get_station_name(conn, sid) for sid in path],
+                "stations": station_names,
                 "transfers": tlist,
             },
         }

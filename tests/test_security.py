@@ -1,14 +1,16 @@
 """安全测试。"""
 
-import pytest
-from fastapi.testclient import TestClient
-import sys
 import os
+import sys
+
+# 强制使用本地 RAPTOR 引擎，保证测试结果可复现
+os.environ["AMAP_KEY"] = ""
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "metro_app_backend_py"))
 os.chdir(os.path.join(os.path.dirname(__file__), "..", "metro_app_backend_py"))
 
 from server import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
