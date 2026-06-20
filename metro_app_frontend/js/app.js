@@ -100,7 +100,7 @@ function renderRoutes(routes) {
   resultsEl.innerHTML = routes.map((r, i) => {
     const isBest = i === 0;
     const badgeHtml = isBest ? '<span class="route-badge green">推荐</span>' : '';
-    const starBtn = `<span class="fav-star" data-from="${r.details.stations[0]}" data-to="${r.details.stations[r.details.stations.length-1]}" data-lines="${r.lines.join(',')}" title="收藏路线">&#9734;</span>`;
+    const starBtn = '';
     const transferBadges = r.details.transfers.map(t =>
       `<span class="transfer-info">换乘: ${t.station} (${t.fromLine} → ${t.toLine}) 步行${t.walkTime}分钟</span>`
     ).join('');
